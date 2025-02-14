@@ -2,6 +2,8 @@ import pulumi
 import pulumi_aws as aws
 import json
 
+ACCOUNT_ID = aws.get_caller_identity().account_id
+
 
 def run():
     bucket = aws.s3.BucketV2(
@@ -24,33 +26,6 @@ def run():
         ],
     )
 
-    publish_policy = aws.iam.Policy(
-        "toad-config-publisher-policy",
-        tags={"project": "toad", "pulumi": "true"},
-        policy=json.dumps(
-            {
-                "Version": "2012-10-17",
-                "Statement": [
-                    {
-                        "Effect": "Allow",
-                        "Action": "s3:PutObject",
-                        "Resource": "arn:aws:s3:::pacorain-toad-configs/*",
-                    },
-                    {
-                        "Effect": "Allow",
-                        "Action": "s3:ListBucket",
-                        "Resource": "arn:aws:s3:::pacorain-toad-configs",
-                    },
-                    {
-                        "Effect": "Allow",
-                        "Action": "s3:GetObject",
-                        "Resource": "arn:aws:s3:::pacorain-toad-configs/*",
-                    },
-                ],
-            }
-        ),
-    )
-
     github_actions_role = aws.iam.Role(
         "toad-github-actions-role",
         tags={"project": "toad", "pulumi": "true"},
@@ -61,18 +36,52 @@ def run():
                     {
                         "Effect": "Allow",
                         "Principal": {
-                            "Federated": f"arn:aws:iam::{aws.get_caller_identity().account_id}:oidc-provider/tokens.actions.githubusercontent.com"
+                            "Federated": f"arn:aws:iam::{aws.get_caller_identity().account_id}:oidc-provider/token.actions.githubusercontent.com"
                         },
                         "Action": "sts:AssumeRoleWithWebIdentity",
                         "Condition": {
                             "StringEquals": {
-                                f"token.actions.githubusercontet.com:sub": "repo:pacorain/toad:ref:refs/heads/main"
+                                "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+                                "token.actions.githubusercontent.com:sub": "repo:pacorain/toad:environment:Home",
                             }
                         },
                     }
                 ],
             }
-        )
+        ),
+    )
+
+    publish_policy = aws.iam.Policy(
+        "toad-config-publisher-policy",
+        tags={"project": "toad", "pulumi": "true"},
+        policy=pulumi.Output.all(role_id=github_actions_role.id).apply(
+            lambda args: json.dumps(
+                {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": ["s3:PutObject", "s3:GetObject"],
+                            "Resource": [
+                                f"arn:aws:s3:::pacorain-toad-configs/*",
+                            ],
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": ["s3:ListBucket"],
+                            "Resource": [f"arn:aws:s3:::pacorain-toad-configs"],
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": ["sts:AssumeRoleWithWebIdentity"],
+                            "Resource": [
+                                f"arn:aws:iam::{ACCOUNT_ID}:role/{args['role_id']}",
+                            ],
+                        },
+                    ],
+                }
+            )
+        ),
     )
 
     aws.iam.RolePolicyAttachment(
@@ -81,4 +90,8 @@ def run():
         role=github_actions_role.name,
     )
 
-    
+    aws.iam.OpenIdConnectProvider(
+        "toad-github-actions-oidc-provider",
+        url="https://token.actions.githubusercontent.com",
+        client_id_lists=["sts.amazonaws.com"],
+    )
