@@ -1,2 +1,7 @@
+encryptionsalt: v1:+CbgmtVYCVk=:v1:eU1FluOEC0CXpxMB:C/fRPtEqP72cm3KQbDhfzx1MCko3qw==
 config:
   aws:region: us-east-1
+  bowser:account-email:
+    secure: v1:+1HfCJjoJg7D5xUL:Z4sSTGGxIhpynXJ+6T0heJingfDjoF+nLIVvenlQ4Nqg4exEDZ43
+  bowser:pagerduty-email:
+    secure: v1:L5zfIs+jIQMYWtZ4:/3Cagxr+0ImX3La770U+KXm8vRGtvab5yK5VfAXq1E0yKvpYT68hiBqUwkBwMl0lY6Xh2N+CrZ0maJOfGJYAXF7rZWKo5yWAYIw=
